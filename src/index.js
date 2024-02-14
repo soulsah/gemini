@@ -1,16 +1,16 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+import express from 'express';
+import dotenv from 'dotenv'
+import routes from './http/routes.js'
 
-const genAI = new GoogleGenerativeAI(process.env.API_KEY);
+const port = process.env.PORT || 9999;
 
-async function run() {
-  const model = genAI.getGenerativeModel({ model: "gemini-pro"});
+const app = express();
+dotenv.config();
 
-  const prompt = "Write a story about a magic backpack."
+app.use(express.json());
+app.use(routes)
 
-  const result = await model.generateContent(prompt);
-  const response = await result.response;
-  const text = response.text();
-  console.log(text);
-}
 
-run();
+app.listen(port, () => {
+  console.log(`Server running on http://localhost:${port}`);
+})
