@@ -1,17 +1,12 @@
-// app.js
-
 import express from 'express';
 import bodyParser from 'body-parser';
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 import dotenv from 'dotenv';
 import cors from 'cors';
 
-const app = express();
-
-app.use(bodyParser.json());
-app.use(cors());
 dotenv.config();
 
+const app = express();
 const port = process.env.PORT || 9999;
 const genAI = new GoogleGenerativeAI(process.env.API_KEY);
 
@@ -65,11 +60,27 @@ let history = [
     parts: "Olá! Agradecemos por entrar em contato com o serviço de consignado do grupo AMP. Podemos te ajudar com isso. Para começar, informe seu nome para darmos início ao atendimento"
   }
 ];
-app.get('/chat', (req, res) => {
-  res.json(history);
+
+// Middleware
+app.use(bodyParser.json());
+app.use(cors());
+
+// Routes
+app.get('/chat', getChatHistory);
+app.post('/chat', handleUserMessage);
+
+// Server start
+app.listen(port, () => {
+  console.log(`Server listening at http://localhost:${port}`);
 });
 
-app.post('/chat', async (req, res) => {
+// Functions
+
+function getChatHistory(req, res) {
+  res.json(history);
+}
+
+async function handleUserMessage(req, res) {
   const generationConfig = {
     temperature: 0.9,
     topK: 1,
@@ -77,7 +88,29 @@ app.post('/chat', async (req, res) => {
     maxOutputTokens: 2048,
   };
 
-  const safetySettings = [
+  const safetySettings = getSafetySettings();
+
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-pro',
+    generationConfig,
+    safetySettings,
+  });
+
+  const chatModel = model.startChat({ history });
+
+  const userMessage = req.body.message;
+  history.push({ role: 'user', parts: userMessage });
+
+  const result = await chatModel.sendMessage(userMessage);
+  const aiMessage = await result.response;
+
+  history.push({ role: 'model', parts: aiMessage.text() });
+
+  res.json({ success: true, message: aiMessage.text() });
+}
+
+function getSafetySettings() {
+  return [
     {
       category: HarmCategory.HARM_CATEGORY_HARASSMENT,
       threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
@@ -95,29 +128,4 @@ app.post('/chat', async (req, res) => {
       threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
     },
   ];
-
-  const model = genAI.getGenerativeModel({ 
-    model: 'gemini-pro', 
-    generationConfig,
-    safetySettings 
-  });
-
-
-  const chatModel = model.startChat({
-    history: history
-  });
-
-  const userMessage = req.body.message;
-
-  const result = await chatModel.sendMessage(userMessage);
-
-  history.push({ role: "user", parts: userMessage });
-  const aiMessage = await result.response;
-  history.push({ role: "model", parts: aiMessage.text() });
-
-  res.json({ success: true, message: aiMessage.text() });
-});
-
-app.listen(port, () => {
-  console.log(`Server listening at http://localhost:${port}`);
-});
+}
