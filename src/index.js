@@ -57,11 +57,13 @@ app.post('/chat', async (req, res) => {
 
   const userMessage = req.body.message;
 
-  const result = await model.generateContentStream(userMessage);
+  const result = await model.generateContentStream(userMessage, {
+    context: chatHistory
+  });
 
-  chatHistory.push({ role: "user", parts: userMessage });
+  chatHistory.push({ role: "user", parts: [{ text: userMessage }] });
   const aiMessage = await result.response;
-  chatHistory.push({ role: "model", parts: aiMessage.text() });
+  chatHistory.push({ role: "model", parts: [{ text:aiMessage.text() }] });
 
   res.json({ success: true, message: aiMessage.text() });
 });
