@@ -15,14 +15,13 @@ dotenv.config();
 const port = process.env.PORT || 9999;
 const genAI = new GoogleGenerativeAI(process.env.API_KEY);
 
-let chatHistory = [];
+let history = [];
 
 app.get('/chat', (req, res) => {
-  res.json(chatHistory);
+  res.json(history);
 });
 
 app.post('/chat', async (req, res) => {
-  const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
   const generationConfig = {
     temperature: 0.9,
     topK: 1,
@@ -48,22 +47,25 @@ app.post('/chat', async (req, res) => {
       threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
     },
   ];
-  console.log(chatHistory)
-  model.startChat({
+
+  const model = genAI.getGenerativeModel({ 
+    model: 'gemini-pro', 
     generationConfig,
-    safetySettings,
-    history: chatHistory
+    safetySettings 
+  });
+
+
+  const chatModel = model.startChat({
+    history: history
   });
 
   const userMessage = req.body.message;
 
-  const result = await model.generateContentStream(userMessage, {
-    context: chatHistory
-  });
+  const result = await chatModel.sendMessage(userMessage);
 
-  chatHistory.push({ role: "user", parts: [{ text: userMessage }] });
+  history.push({ role: "user", parts: userMessage });
   const aiMessage = await result.response;
-  chatHistory.push({ role: "model", parts: [{ text:aiMessage.text() }] });
+  history.push({ role: "model", parts: aiMessage.text() });
 
   res.json({ success: true, message: aiMessage.text() });
 });
